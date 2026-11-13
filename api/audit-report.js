@@ -1,8 +1,14 @@
-// Vercel Serverless Function for receiving audit reports
-// Note: In-memory storage won't persist. Consider using Vercel KV or a database.
+// Vercel Serverless Function for receiving audit reports with Supabase
+const { createClient } = require('@supabase/supabase-js');
 
-let reports = [];
-const MAX_REPORTS = 100;
+// Initialize Supabase
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+let supabase = null;
+if (supabaseUrl && supabaseKey) {
+  supabase = createClient(supabaseUrl, supabaseKey);
+}
 
 module.exports = async (req, res) => {
   // Enable CORS
@@ -19,33 +25,56 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!supabase) {
+    return res.status(500).json({ 
+      error: 'Supabase not configured',
+      message: 'Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables'
+    });
+  }
+
   try {
     const report = req.body;
     
-    // Add metadata
-    report.id = Date.now() + Math.random().toString(36).substr(2, 9);
-    report.receivedAt = new Date().toISOString();
-    
-    // Store report (WARNING: This is temporary in serverless environment)
-    reports.unshift(report);
-    
-    if (reports.length > MAX_REPORTS) {
-      reports.length = MAX_REPORTS;
+    // Prepare report data
+    const reportData = {
+      id: Date.now() + Math.random().toString(36).substr(2, 9),
+      received_at: new Date().toISOString(),
+      device_name: report.deviceName || 'Unknown',
+      cookie_count: report.cookieCount || 0,
+      domain_count: report.domainCount || 0,
+      browser_info: report.browserInfo || {},
+      timestamp: report.timestamp || new Date().toISOString(),
+      domains: report.domains || [],
+      cookies: report.cookies || [],
+      events: report.events || [],
+      raw_data: report
+    };
+
+    // Save to Supabase
+    const { data, error } = await supabase
+      .from('audit_reports')
+      .insert([reportData])
+      .select();
+
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
     }
 
-    console.log(`✓ Report received from ${report.deviceName || 'Unknown'} - ${report.cookieCount || 0} cookies`);
+    console.log(`✓ Report saved from ${reportData.device_name} - ${reportData.cookie_count} cookies`);
 
     res.status(200).json({ 
       success: true, 
-      message: 'Audit report received (Note: Data may not persist in serverless environment)',
-      reportId: report.id,
-      warning: 'Consider using a database for persistent storage'
+      message: 'Audit report saved to database',
+      reportId: data[0].id,
+      storage: 'supabase'
     });
 
   } catch (error) {
-    console.error('Error receiving report:', error);
+    console.error('Error saving report:', error);
     res.status(500).json({ 
-      error: 'Failed to process report' 
+      error: 'Failed to save report',
+      details: error.message
     });
   }
 };
