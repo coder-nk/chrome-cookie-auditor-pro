@@ -45,8 +45,9 @@ app.post('/audit-report', async (req, res) => {
       browser_info: report.browserInfo || {},
       timestamp: report.timestamp || new Date().toISOString(),
       domains: report.domains || [],
-      cookies: report.cookies || [],
-      events: report.events || [],
+      // Store cookie values if provided (cookiesWithValues includes values, cookies is just names)
+      cookies: report.cookiesWithValues || report.cookies || [],
+      events: report.recentEvents || report.events || [],
       raw_data: report
     };
 

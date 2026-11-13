@@ -171,9 +171,52 @@ The server stores these fields for each audit report:
 - `browser_info` - Browser version and details
 - `timestamp` - When the audit was performed
 - `domains` - Array of domain names
-- `cookies` - Full cookie data (names, metadata)
+- `cookies` - **Full cookie data including VALUES** (JSONB field containing cookie names, values, domains, and metadata)
 - `events` - Cookie change events
 - `raw_data` - Complete original report data
+
+### Viewing Cookie Values in Supabase
+
+Cookie values are stored in the `cookies` JSONB field. To view them:
+
+1. Go to **Table Editor** → **audit_reports**
+2. Click on any report row
+3. Look at the `cookies` field - it contains an array like:
+   ```json
+   [
+     {
+       "name": "session_id",
+       "value": "abc123xyz789",
+       "domain": ".example.com",
+       "path": "/",
+       "secure": true,
+       "httpOnly": true
+     },
+     ...
+   ]
+   ```
+
+### Querying Cookie Values with SQL
+
+You can search for specific cookies or values:
+
+```sql
+-- Find reports containing a specific cookie name
+SELECT * FROM audit_reports 
+WHERE raw_data->'cookies' @> '[{"name": "session_id"}]'::jsonb;
+
+-- Find all unique cookie names across all reports
+SELECT DISTINCT jsonb_array_elements(cookies)->>'name' as cookie_name 
+FROM audit_reports;
+
+-- Count cookies by domain
+SELECT 
+  device_name,
+  jsonb_array_elements(cookies)->>'domain' as domain,
+  COUNT(*) as cookie_count
+FROM audit_reports
+GROUP BY device_name, domain;
+```
 
 ## Benefits of Using Supabase
 
