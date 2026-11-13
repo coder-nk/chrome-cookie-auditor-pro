@@ -1,15 +1,30 @@
 {
   "version": 2,
-  "builds": [
+  "functions": {
+    "api/**/*.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
     {
-      "src": "audit-server/server.js",
-      "use": "@vercel/node"
+      "source": "/",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/audit-report",
+      "destination": "/api/audit-report"
     }
   ],
-  "routes": [
+  "headers": [
     {
-      "src": "/(.*)",
-      "dest": "audit-server/server.js"
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
     }
   ]
 }
