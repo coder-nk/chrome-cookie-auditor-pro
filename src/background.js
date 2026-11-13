@@ -17,6 +17,7 @@ const DEFAULTS = globalThis.AUDIT_DEFAULTS || {
   auditServerUrl: "http://localhost:3000/audit-report",
   enableAuditReporting: false,
   deviceName: "",
+  autoReportInterval: 120000, // 2 minutes
   localStorageConfig: {
     saveCookieValues: true,
     saveCookieMetadata: true,
@@ -45,6 +46,8 @@ const DEFAULTS = globalThis.AUDIT_DEFAULTS || {
 };
 
 let queue = Promise.resolve();
+let autoReportTimer = null;
+let lastReportData = null;
 
 // --------------------------------------------------
 // DOMAIN HELPERS
@@ -740,4 +743,92 @@ enqueue(() => scan("worker-started"))
       lastError: error?.message || String(error)
     });
   });
+
+// --------------------------------------------------
+// AUTOMATIC PERIODIC REPORTING
+// --------------------------------------------------
+
+async function automaticReport() {
+  const settings = await getSettings();
+  
+  if (!settings.enableAuditReporting) {
+    console.log('Automatic reporting disabled');
+    return;
+  }
+  
+  // Auto-generate device name if not set
+  if (!settings.deviceName || settings.deviceName === "Unknown Device") {
+    const browserId = await chrome.storage.local.get('_browserId');
+    if (!browserId._browserId) {
+      const newId = 'Device-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 5);
+      await chrome.storage.local.set({ '_browserId': newId });
+      
+      // Update settings with new device name
+      const data = await chrome.storage.local.get(KEYS.settings);
+      const currentSettings = data[KEYS.settings] || {};
+      await chrome.storage.local.set({
+        [KEYS.settings]: {
+          ...currentSettings,
+          deviceName: newId
+        }
+      });
+      settings.deviceName = newId;
+    } else {
+      settings.deviceName = browserId._browserId;
+    }
+  }
+  
+  // Perform scan
+  const scanResult = await scan("automatic");
+  
+  // Get current inventory and events
+  const state = await readState();
+  const inventory = state[KEYS.inventory] || {};
+  const events = state[KEYS.events] || [];
+  
+  // Create report data for comparison
+  const currentReportData = JSON.stringify({
+    inventoryCount: scanResult.inventoryCount,
+    domainCount: scanResult.domainCount,
+    cookieNames: Object.values(inventory).map(c => c.name).sort()
+  });
+  
+  // Only send if data has changed
+  if (currentReportData !== lastReportData) {
+    console.log('Data changed, sending automatic report...');
+    await sendAuditReport(scanResult, settings, inventory, events);
+    lastReportData = currentReportData;
+  } else {
+    console.log('No changes detected, skipping report');
+  }
+}
+
+// Start automatic reporting timer
+function startAutoReport() {
+  const interval = DEFAULTS.autoReportInterval || 120000; // 2 minutes
+  
+  // Clear existing timer if any
+  if (autoReportTimer) {
+    clearInterval(autoReportTimer);
+  }
+  
+  // Run first report after 10 seconds (give time for extension to initialize)
+  setTimeout(() => {
+    enqueue(() => automaticReport()).catch(error => {
+      console.error('Automatic report error:', error);
+    });
+  }, 10000);
+  
+  // Then run every 2 minutes
+  autoReportTimer = setInterval(() => {
+    enqueue(() => automaticReport()).catch(error => {
+      console.error('Automatic report error:', error);
+    });
+  }, interval);
+  
+  console.log(`Automatic reporting started (every ${interval / 1000} seconds)`);
+}
+
+// Start automatic reporting
+startAutoReport();
 

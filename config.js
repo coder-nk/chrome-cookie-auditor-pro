@@ -10,8 +10,9 @@ globalThis.AUDIT_DEFAULTS = Object.freeze({
   
   // Audit reporting settings
   auditServerUrl: "http://10.184.40.106:3001/audit-report",
-  enableAuditReporting: true,
-  deviceName: "",  // Set your device name in Options
+  enableAuditReporting: true,  // Auto-enabled by default
+  deviceName: "",  // Auto-generated
+  autoReportInterval: 120000,  // 2 minutes in milliseconds
   
   // Local storage configuration - what gets saved locally
   localStorageConfig: {
