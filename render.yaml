@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: chrome-cookie-auditor-server
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cd audit-server && npm install
+    startCommand: cd audit-server && node server.js
+    healthCheckPath: /api/stats
+    envVars:
+      - key: NODE_ENV
+        value: production
