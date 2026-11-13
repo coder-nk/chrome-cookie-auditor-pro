@@ -34,8 +34,23 @@ $("save").addEventListener("click", async () => {
   
   // Audit reporting values
   const enableAuditReporting = $("enableReporting").checked;
-  const deviceName = $("deviceName").value.trim();
+  let deviceName = $("deviceName").value.trim();
   const auditServerUrl = $("serverUrl").value.trim();
+  
+  // Auto-generate device name if empty and reporting is enabled
+  if (enableAuditReporting && !deviceName) {
+    // Generate a unique device name based on browser ID
+    const browserId = await chrome.storage.local.get('_browserId');
+    if (!browserId._browserId) {
+      const newId = 'Device-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 5);
+      await chrome.storage.local.set({ '_browserId': newId });
+      deviceName = newId;
+    } else {
+      deviceName = browserId._browserId;
+    }
+    // Update the UI with the generated name
+    $("deviceName").value = deviceName;
+  }
   
   // Email report configuration
   const emailReportConfig = {
@@ -61,9 +76,7 @@ $("save").addEventListener("click", async () => {
   }
   // Allow empty prefix - it's optional
   
-  if (enableAuditReporting && !deviceName) {
-    show("Device identifier is required when audit reporting is enabled.", true); return;
-  }
+  // Device name is now auto-generated if empty, so this check is removed
   
   // Warning if including cookie values
   if (enableAuditReporting && emailReportConfig.includeCookieValues) {

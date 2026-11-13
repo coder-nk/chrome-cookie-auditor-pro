@@ -5,10 +5,10 @@
  * Sends a sample audit report to check if data is stored correctly
  */
 
-const https = require('https');
+const http = require('http');
 
 // Your Vercel endpoint
-const VERCEL_URL = 'https://chrome-cookie-auditor-pro.vercel.app/audit-report';
+const VERCEL_URL = 'http://10.184.40.106:3001/audit-report';
 
 // Sample audit report data
 const testReport = {
@@ -84,7 +84,7 @@ const postData = JSON.stringify(testReport);
 
 const options = {
   hostname: url.hostname,
-  port: 443,
+  port: url.port || 3001,
   path: url.pathname,
   method: 'POST',
   headers: {
@@ -93,7 +93,7 @@ const options = {
   }
 };
 
-const req = https.request(options, (res) => {
+const req = http.request(options, (res) => {
   let data = '';
 
   res.on('data', (chunk) => {
@@ -115,8 +115,8 @@ const req = https.request(options, (res) => {
         console.log('✅ SUCCESS! Connection test passed!');
         console.log('');
         console.log('Next steps:');
-        console.log('1. Go to your Supabase dashboard:');
-        console.log('   https://onxaphgsqodiqctawlzm.supabase.co');
+        console.log('1. Go to your local dashboard:');
+        console.log('   http://10.184.40.106:3001');
         console.log('');
         console.log('2. Navigate to: Table Editor → audit_reports');
         console.log('');

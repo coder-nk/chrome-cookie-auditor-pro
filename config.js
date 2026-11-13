@@ -9,7 +9,7 @@ globalThis.AUDIT_DEFAULTS = Object.freeze({
   maxEvents: 2000,
   
   // Audit reporting settings
-  auditServerUrl: "http://10.184.40.106:3000/audit-report",
+  auditServerUrl: "http://10.184.40.106:3001/audit-report",
   enableAuditReporting: true,
   deviceName: "",  // Set your device name in Options
   
