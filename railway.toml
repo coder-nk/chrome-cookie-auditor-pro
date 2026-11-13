@@ -2,6 +2,5 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "cd audit-server && npm start"
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
+startCommand = "npm start"
+watchPatterns = ["/audit-server/**"]
