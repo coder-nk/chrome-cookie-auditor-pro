@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cookie Auditor Pro</title>
+  <link rel="stylesheet" href="src/popup.css">
+</head>
+<body>
+  <main>
+    <header class="top">
+      <div class="logo">CA</div>
+      <div class="brand"><h1>Cookie Auditor Pro</h1><p>Local inventory · Test-cookie diagnostics</p></div>
+      <button id="settings" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+    </header>
+
+    <section class="status panel">
+      <div class="status-head"><span id="statusDot" class="dot"></span><strong id="statusText">Checking extension…</strong></div>
+      <p id="statusDetail">Reading local audit status.</p>
+      <div class="meta-line"><span id="scanTime">No scan yet</span><span id="errorText"></span></div>
+    </section>
+
+    <section class="stats">
+      <div class="stat"><strong id="inventoryCount">—</strong><span>Cookies inventoried</span></div>
+      <div class="stat"><strong id="testCount">—</strong><span>Test cookies with values</span></div>
+      <div class="stat"><strong id="eventCount">—</strong><span>Change events</span></div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head"><h2>Cookie inventory</h2><span id="excludedCount" class="muted"></span></div>
+      <input id="search" type="search" placeholder="Filter by name or domain…" autocomplete="off">
+      <div id="inventory" class="inventory"><p class="empty">Run a scan to view cookies.</p></div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head"><h2>Recent changes</h2><span class="muted">Metadata only</span></div>
+      <div id="events" class="events"><p class="empty">No events recorded.</p></div>
+    </section>
+
+    <div class="actions">
+      <button id="scan" class="primary">Scan now</button>
+      <button id="export">Export JSON</button>
+    </div>
+    <button id="clear" class="danger">Clear local records</button>
+    <p id="message" role="status" aria-live="polite"></p>
+    <footer>Values are stored only for non-excluded cookies matching your test prefix. Authentication/session names are excluded by default.</footer>
+  </main>
+  <script src="config.js"></script>
+  <script src="src/popup.js"></script>
+</body>
+</html>

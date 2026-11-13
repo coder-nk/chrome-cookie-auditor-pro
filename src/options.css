@@ -1,0 +1,18 @@
+*{box-sizing:border-box}
+body{margin:0;background:#0d1420;color:#eaf0fa;font:14px/1.55 Inter,system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:28px 20px 40px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.logo{width:42px;height:42px;border-radius:13px;background:#1c4772;display:grid;place-items:center;font-weight:800;color:#bfe0ff}
+h1{font-size:22px;margin:0}header p{color:#91a3ba;margin:2px 0}
+.card{background:#121e2d;border:1px solid #293a50;border-radius:12px;padding:18px;margin:14px 0}
+h2{font-size:15px;margin:0 0 6px}p{color:#a6b6c9;margin:6px 0 12px}
+code{color:#b6dcff;background:#1a2c40;padding:2px 4px;border-radius:4px}
+textarea,input{display:block;width:100%;background:#0b1522;border:1px solid #344960;border-radius:8px;padding:11px;color:#eef5ff;font:13px/1.5 ui-monospace,monospace;resize:vertical}
+textarea:focus,input:focus{outline:2px solid #276da7;border-color:#4a9bd8}
+.actions{display:flex;gap:10px;margin:18px 0}
+button{border:1px solid #40556e;border-radius:8px;padding:10px 15px;background:#1b2a3d;color:#f2f7ff;font:inherit;cursor:pointer}
+button.primary{background:#1768a8;border-color:#3989c5}
+.note{border-color:#5a4b2c;background:#211e17}.note p{margin-bottom:0}
+#message{min-height:20px}.ok{color:#8de0b2}.bad{color:#ffaaaa}
+footer{color:#8092a8;font-size:12px;margin-top:18px}
+@media(max-width:520px){main{padding:18px 12px}.actions{flex-direction:column}}
