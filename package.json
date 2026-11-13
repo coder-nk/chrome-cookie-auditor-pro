@@ -1,0 +1,16 @@
+{
+  "name": "chrome-cookie-auditor-pro",
+  "version": "1.0.0",
+  "description": "Chrome Cookie Auditor with centralized dashboard",
+  "main": "audit-server/server.js",
+  "scripts": {
+    "start": "node audit-server/server.js",
+    "dev": "node audit-server/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
