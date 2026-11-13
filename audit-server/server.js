@@ -1,94 +1,93 @@
-// Cookie Auditor Dashboard Server with Supabase
+// Cookie Auditor Dashboard Server with Local SQLite Database
 // Run with: node server.js
 // Access dashboard at: http://localhost:3000
 
 const express = require('express');
 const path = require('path');
-const { createClient } = require('@supabase/supabase-js');
+const Database = require('better-sqlite3');
+const fs = require('fs');
 
 const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Initialize Supabase client
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_ANON_KEY || '';
+// Initialize SQLite database
+const dbPath = process.env.DB_PATH || path.join(__dirname, 'audit_data.db');
+const db = new Database(dbPath);
 
-let supabase = null;
+// Create tables if they don't exist
+db.exec(`
+  CREATE TABLE IF NOT EXISTS audit_reports (
+    id TEXT PRIMARY KEY,
+    received_at TEXT NOT NULL,
+    device_name TEXT,
+    cookie_count INTEGER DEFAULT 0,
+    domain_count INTEGER DEFAULT 0,
+    browser_info TEXT,
+    timestamp TEXT,
+    domains TEXT,
+    cookies TEXT,
+    events TEXT,
+    raw_data TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 
-// Initialize Supabase if credentials are provided
-if (supabaseUrl && supabaseKey) {
-  supabase = createClient(supabaseUrl, supabaseKey);
-  console.log('✓ Supabase connected');
-} else {
-  console.warn('⚠️  Supabase credentials not found. Using in-memory storage (data will be lost on restart)');
-  console.warn('⚠️  Set SUPABASE_URL and SUPABASE_ANON_KEY environment variables for persistent storage');
-}
+  CREATE INDEX IF NOT EXISTS idx_received_at ON audit_reports(received_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_device_name ON audit_reports(device_name);
+`);
 
-// Fallback in-memory storage if Supabase is not configured
-const memoryReports = [];
-const MAX_REPORTS = 1000;
+console.log('✓ SQLite database initialized:', dbPath);
 
 // Endpoint to receive audit reports
 app.post('/audit-report', async (req, res) => {
   try {
     const report = req.body;
     
-    // Add metadata
+    // Prepare report data
     const reportData = {
       id: Date.now() + Math.random().toString(36).substr(2, 9),
       received_at: new Date().toISOString(),
       device_name: report.deviceName || 'Unknown',
       cookie_count: report.cookieCount || 0,
       domain_count: report.domainCount || 0,
-      browser_info: report.browserInfo || {},
+      browser_info: JSON.stringify(report.browserInfo || {}),
       timestamp: report.timestamp || new Date().toISOString(),
-      domains: report.domains || [],
-      // Store cookie values if provided (cookiesWithValues includes values, cookies is just names)
-      cookies: report.cookiesWithValues || report.cookies || [],
-      events: report.recentEvents || report.events || [],
-      raw_data: report
+      domains: JSON.stringify(report.domains || []),
+      cookies: JSON.stringify(report.cookiesWithValues || report.cookies || []),
+      events: JSON.stringify(report.recentEvents || report.events || []),
+      raw_data: JSON.stringify(report)
     };
 
-    // Store in Supabase or memory
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('audit_reports')
-        .insert([reportData])
-        .select();
+    // Insert into SQLite
+    const stmt = db.prepare(`
+      INSERT INTO audit_reports 
+      (id, received_at, device_name, cookie_count, domain_count, browser_info, timestamp, domains, cookies, events, raw_data)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
+    stmt.run(
+      reportData.id,
+      reportData.received_at,
+      reportData.device_name,
+      reportData.cookie_count,
+      reportData.domain_count,
+      reportData.browser_info,
+      reportData.timestamp,
+      reportData.domains,
+      reportData.cookies,
+      reportData.events,
+      reportData.raw_data
+    );
 
-      console.log(`✓ Report saved to Supabase from ${reportData.device_name} - ${reportData.cookie_count} cookies`);
-      
-      res.json({ 
-        success: true, 
-        message: 'Audit report saved to database',
-        reportId: data[0].id,
-        storage: 'supabase'
-      });
-    } else {
-      // Fallback to memory
-      memoryReports.unshift(reportData);
-      
-      if (memoryReports.length > MAX_REPORTS) {
-        memoryReports.length = MAX_REPORTS;
-      }
+    console.log(`✓ Report saved to database from ${reportData.device_name} - ${reportData.cookie_count} cookies`);
 
-      console.log(`✓ Report stored in memory from ${reportData.device_name} - ${reportData.cookie_count} cookies`);
-
-      res.json({ 
-        success: true, 
-        message: 'Audit report received (in-memory storage)',
-        reportId: reportData.id,
-        storage: 'memory',
-        warning: 'Data will be lost on server restart. Configure Supabase for persistence.'
-      });
-    }
+    res.json({ 
+      success: true, 
+      message: 'Audit report saved to local database',
+      reportId: reportData.id,
+      storage: 'sqlite'
+    });
 
   } catch (error) {
     console.error('Error receiving report:', error);
@@ -102,19 +101,20 @@ app.post('/audit-report', async (req, res) => {
 // Get all reports
 app.get('/api/reports', async (req, res) => {
   try {
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('audit_reports')
-        .select('*')
-        .order('received_at', { ascending: false })
-        .limit(1000);
-
-      if (error) throw error;
-
-      res.json(data);
-    } else {
-      res.json(memoryReports);
-    }
+    const stmt = db.prepare('SELECT * FROM audit_reports ORDER BY received_at DESC LIMIT 1000');
+    const rows = stmt.all();
+    
+    // Parse JSON fields
+    const reports = rows.map(row => ({
+      ...row,
+      browser_info: JSON.parse(row.browser_info || '{}'),
+      domains: JSON.parse(row.domains || '[]'),
+      cookies: JSON.parse(row.cookies || '[]'),
+      events: JSON.parse(row.events || '[]'),
+      raw_data: JSON.parse(row.raw_data || '{}')
+    }));
+    
+    res.json(reports);
   } catch (error) {
     console.error('Error fetching reports:', error);
     res.status(500).json({ error: 'Failed to fetch reports' });
@@ -124,29 +124,24 @@ app.get('/api/reports', async (req, res) => {
 // Get single report
 app.get('/api/reports/:id', async (req, res) => {
   try {
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('audit_reports')
-        .select('*')
-        .eq('id', req.params.id)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return res.status(404).json({ error: 'Report not found' });
-        }
-        throw error;
-      }
-
-      res.json(data);
-    } else {
-      const report = memoryReports.find(r => r.id === req.params.id);
-      if (report) {
-        res.json(report);
-      } else {
-        res.status(404).json({ error: 'Report not found' });
-      }
+    const stmt = db.prepare('SELECT * FROM audit_reports WHERE id = ?');
+    const row = stmt.get(req.params.id);
+    
+    if (!row) {
+      return res.status(404).json({ error: 'Report not found' });
     }
+    
+    // Parse JSON fields
+    const report = {
+      ...row,
+      browser_info: JSON.parse(row.browser_info || '{}'),
+      domains: JSON.parse(row.domains || '[]'),
+      cookies: JSON.parse(row.cookies || '[]'),
+      events: JSON.parse(row.events || '[]'),
+      raw_data: JSON.parse(row.raw_data || '{}')
+    };
+    
+    res.json(report);
   } catch (error) {
     console.error('Error fetching report:', error);
     res.status(500).json({ error: 'Failed to fetch report' });
@@ -156,24 +151,14 @@ app.get('/api/reports/:id', async (req, res) => {
 // Delete report
 app.delete('/api/reports/:id', async (req, res) => {
   try {
-    if (supabase) {
-      const { error } = await supabase
-        .from('audit_reports')
-        .delete()
-        .eq('id', req.params.id);
-
-      if (error) throw error;
-
-      res.json({ success: true });
-    } else {
-      const index = memoryReports.findIndex(r => r.id === req.params.id);
-      if (index !== -1) {
-        memoryReports.splice(index, 1);
-        res.json({ success: true });
-      } else {
-        res.status(404).json({ error: 'Report not found' });
-      }
+    const stmt = db.prepare('DELETE FROM audit_reports WHERE id = ?');
+    const result = stmt.run(req.params.id);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Report not found' });
     }
+    
+    res.json({ success: true });
   } catch (error) {
     console.error('Error deleting report:', error);
     res.status(500).json({ error: 'Failed to delete report' });
@@ -183,19 +168,8 @@ app.delete('/api/reports/:id', async (req, res) => {
 // Clear all reports
 app.delete('/api/reports', async (req, res) => {
   try {
-    if (supabase) {
-      const { error } = await supabase
-        .from('audit_reports')
-        .delete()
-        .neq('id', ''); // Delete all
-
-      if (error) throw error;
-
-      res.json({ success: true, message: 'All reports cleared from database' });
-    } else {
-      memoryReports.length = 0;
-      res.json({ success: true, message: 'All reports cleared from memory' });
-    }
+    db.prepare('DELETE FROM audit_reports').run();
+    res.json({ success: true, message: 'All reports cleared from database' });
   } catch (error) {
     console.error('Error clearing reports:', error);
     res.status(500).json({ error: 'Failed to clear reports' });
@@ -205,33 +179,44 @@ app.delete('/api/reports', async (req, res) => {
 // Get statistics
 app.get('/api/stats', async (req, res) => {
   try {
-    let reports = [];
+    const stmt = db.prepare(`
+      SELECT 
+        device_name,
+        cookie_count,
+        domains,
+        received_at
+      FROM audit_reports 
+      ORDER BY received_at DESC
+    `);
+    const rows = stmt.all();
     
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('audit_reports')
-        .select('device_name, cookie_count, domains, received_at')
-        .order('received_at', { ascending: false });
-
-      if (error) throw error;
-      reports = data;
-    } else {
-      reports = memoryReports;
-    }
-
-    const devices = [...new Set(reports.map(r => r.device_name))];
-    const totalCookies = reports.reduce((sum, r) => sum + (r.cookie_count || 0), 0);
-    const allDomains = reports.flatMap(r => r.domains || []);
-    const domains = [...new Set(allDomains)];
+    // Parse domains and calculate stats
+    const devices = [...new Set(rows.map(r => r.device_name))];
+    const totalCookies = rows.reduce((sum, r) => sum + (r.cookie_count || 0), 0);
+    
+    const allDomains = [];
+    rows.forEach(r => {
+      try {
+        const domains = JSON.parse(r.domains || '[]');
+        allDomains.push(...domains);
+      } catch (e) {}
+    });
+    const uniqueDomains = [...new Set(allDomains)];
+    
+    const lastReport = rows[0] ? {
+      ...rows[0],
+      domains: JSON.parse(rows[0].domains || '[]')
+    } : null;
     
     res.json({
-      totalReports: reports.length,
+      totalReports: rows.length,
       devices: devices.length,
       deviceList: devices,
       totalCookies,
-      uniqueDomains: domains.length,
-      lastReport: reports[0] || null,
-      storage: supabase ? 'supabase' : 'memory'
+      uniqueDomains: uniqueDomains.length,
+      lastReport,
+      storage: 'sqlite',
+      dbPath: dbPath
     });
   } catch (error) {
     console.error('Error fetching stats:', error);
@@ -240,25 +225,43 @@ app.get('/api/stats', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const HOST = process.env.HOST || '0.0.0.0'; // Listen on all network interfaces
+
+app.listen(PORT, HOST, () => {
+  // Get local network IP
+  const os = require('os');
+  const networkInterfaces = os.networkInterfaces();
+  const localIPs = [];
+  
+  Object.keys(networkInterfaces).forEach(interfaceName => {
+    networkInterfaces[interfaceName].forEach(iface => {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        localIPs.push(iface.address);
+      }
+    });
+  });
+
   console.log(`
 ╔════════════════════════════════════════════════════╗
 ║   Cookie Auditor Dashboard Server                 ║
 ╚════════════════════════════════════════════════════╝
 
 ✓ Server running on port ${PORT}
-✓ Dashboard: http://localhost:${PORT}
-✓ API endpoint: http://localhost:${PORT}/audit-report
-✓ Storage: ${supabase ? 'Supabase (persistent)' : 'Memory (temporary)'}
+✓ Storage: SQLite Database (persistent)
+✓ Database: ${dbPath}
 
-${!supabase ? `
-⚠️  Configure Supabase for persistent storage:
-   1. Create account at https://supabase.com
-   2. Create a new project
-   3. Set environment variables:
-      - SUPABASE_URL=your_project_url
-      - SUPABASE_ANON_KEY=your_anon_key
-` : ''}
-Ready to receive audit reports...
+📍 Access Points:
+   
+   Local Machine:
+   • http://localhost:${PORT}
+   
+   Network Access:${localIPs.length > 0 ? localIPs.map(ip => `
+   • http://${ip}:${PORT}`).join('') : `
+   • No network interface found`}
+
+📱 For Chrome Extension Configuration:
+   ${localIPs.length > 0 ? `Use: http://${localIPs[0]}:${PORT}/audit-report` : `Use: http://localhost:${PORT}/audit-report`}
+
+Ready to receive audit reports from any device on your network...
   `);
 });
