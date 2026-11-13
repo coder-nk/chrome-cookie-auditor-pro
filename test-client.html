@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Auditor - Connection Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .config {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .config input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Cookie Auditor - Connection Test</h1>
+        <p>Use this page to test connectivity from client machines to the audit server.</p>
+        
+        <div class="config">
+            <h3>Server Configuration</h3>
+            <label>Server IP:</label>
+            <input type="text" id="serverIP" value="10.184.40.106" placeholder="e.g., 192.168.1.100">
+            <label>Server Port:</label>
+            <input type="text" id="serverPort" value="3001" placeholder="e.g., 3000">
+        </div>
+        
+        <div class="test-section">
+            <h3>Test 1: Ping Server</h3>
+            <p>Check if the dashboard is accessible</p>
+            <button onclick="testPing()">🌐 Test Dashboard Access</button>
+            <div id="pingResult"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test 2: Get Statistics</h3>
+            <p>Fetch server statistics via API</p>
+            <button onclick="testStats()">📊 Get Server Stats</button>
+            <div id="statsResult"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test 3: Send Test Report</h3>
+            <p>Send a sample audit report to the server</p>
+            <button onclick="testReport()">📤 Send Test Report</button>
+            <div id="reportResult"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test 4: View Dashboard</h3>
+            <p>Open the dashboard in a new tab</p>
+            <button onclick="openDashboard()">🖥️ Open Dashboard</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>Extension Configuration</h3>
+            <p>Use this URL in your Chrome extension settings:</p>
+            <div class="result info">
+                <strong>Server URL:</strong><br>
+                <span id="extensionURL">http://10.184.40.106:3001/audit-report</span>
+            </div>
+            <button onclick="copyURL()">📋 Copy URL</button>
+        </div>
+    </div>
+    
+    <script>
+        function getServerURL() {
+            const ip = document.getElementById('serverIP').value;
+            const port = document.getElementById('serverPort').value;
+            return `http://${ip}:${port}`;
+        }
+        
+        function updateExtensionURL() {
+            const url = getServerURL() + '/audit-report';
+            document.getElementById('extensionURL').textContent = url;
+        }
+        
+        document.getElementById('serverIP').addEventListener('input', updateExtensionURL);
+        document.getElementById('serverPort').addEventListener('input', updateExtensionURL);
+        
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = 'result ' + type;
+            element.textContent = message;
+        }
+        
+        async function testPing() {
+            const url = getServerURL();
+            showResult('pingResult', '⏳ Testing connection...', 'info');
+            
+            try {
+                const response = await fetch(url, { method: 'GET' });
+                if (response.ok) {
+                    showResult('pingResult', '✅ SUCCESS! Server is reachable\n\nStatus: ' + response.status, 'success');
+                } else {
+                    showResult('pingResult', '⚠️ Server responded but with error\n\nStatus: ' + response.status, 'error');
+                }
+            } catch (error) {
+                showResult('pingResult', '❌ FAILED! Cannot reach server\n\nError: ' + error.message + '\n\nPossible causes:\n- Server is not running\n- Firewall blocking connection\n- Wrong IP or port\n- Not on same network', 'error');
+            }
+        }
+        
+        async function testStats() {
+            const url = getServerURL() + '/api/stats';
+            showResult('statsResult', '⏳ Fetching statistics...', 'info');
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                showResult('statsResult', '✅ SUCCESS! Server API working\n\n' + JSON.stringify(data, null, 2), 'success');
+            } catch (error) {
+                showResult('statsResult', '❌ FAILED!\n\nError: ' + error.message, 'error');
+            }
+        }
+        
+        async function testReport() {
+            const url = getServerURL() + '/audit-report';
+            showResult('reportResult', '⏳ Sending test report...', 'info');
+            
+            const testData = {
+                deviceName: 'Test-Client-' + Date.now(),
+                cookieCount: 5,
+                domainCount: 2,
+                timestamp: new Date().toISOString(),
+                domains: ['example.com', 'test.com'],
+                cookiesWithValues: [
+                    { name: 'test_cookie', value: 'test123', domain: 'example.com' }
+                ]
+            };
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(testData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('reportResult', '✅ SUCCESS! Report sent and saved\n\n' + JSON.stringify(result, null, 2) + '\n\nCheck the dashboard to see your test report!', 'success');
+                } else {
+                    showResult('reportResult', '⚠️ Report sent but server returned error\n\n' + JSON.stringify(result, null, 2), 'error');
+                }
+            } catch (error) {
+                showResult('reportResult', '❌ FAILED!\n\nError: ' + error.message + '\n\nThe extension will also fail to send reports.', 'error');
+            }
+        }
+        
+        function openDashboard() {
+            const url = getServerURL();
+            window.open(url, '_blank');
+        }
+        
+        function copyURL() {
+            const url = document.getElementById('extensionURL').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('✅ URL copied to clipboard!\n\nPaste this in your Chrome extension settings.');
+            });
+        }
+    </script>
+</body>
+</html>
